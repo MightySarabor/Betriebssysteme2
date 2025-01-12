@@ -71,6 +71,8 @@ int main() {
     zmq_connect(requester, "tcp://server:5555");
 
     long long latencies[NUM_MESSAGES];
+    int valid_latencies_count = 0;
+    int negative_latencies_count = 0;
 
     for (int i = 0; i < NUM_MESSAGES; i++) {
         long long client_timestamp_send = current_timestamp_ns();
@@ -79,25 +81,34 @@ int main() {
         long long server_timestamp_receive;
         zmq_recv(requester, &server_timestamp_receive, sizeof(server_timestamp_receive), 0);
 
-        latencies[i] = server_timestamp_receive - client_timestamp_send;
+        long long latency = server_timestamp_receive - client_timestamp_send;
+
+        if (latency >= 0) {
+            latencies[valid_latencies_count++] = latency;
+        } else {
+            negative_latencies_count++;
+        }
     }
 
     zmq_close(requester);
     zmq_ctx_destroy(context);
 
     // Analyse der Latenzen
-    qsort(latencies, NUM_MESSAGES, sizeof(long long), compare_longs_desc);
+    qsort(latencies, valid_latencies_count, sizeof(long long), compare_longs_desc);
     printf("3 höchste Latenzen: %lld ns, %lld ns, %lld ns\n", latencies[0], latencies[1], latencies[2]);
 
-    qsort(latencies, NUM_MESSAGES, sizeof(long long), compare_longs_asc);
+    qsort(latencies, valid_latencies_count, sizeof(long long), compare_longs_asc);
     printf("3 niedrigste Latenzen: %lld ns, %lld ns, %lld ns\n", latencies[0], latencies[1], latencies[2]);
 
-    double median = calculate_median(latencies, NUM_MESSAGES);
+    double median = calculate_median(latencies, valid_latencies_count);
     double ci_lower, ci_upper;
-    bootstrap_confidence_interval(latencies, NUM_MESSAGES, NUM_BOOTSTRAPS, &ci_lower, &ci_upper);
+    bootstrap_confidence_interval(latencies, valid_latencies_count, NUM_BOOTSTRAPS, &ci_lower, &ci_upper);
 
     printf("Median der Latenz: %.2f ns\n", median);
     printf("Konfidenzintervall (95%%): [%.2f ns, %.2f ns]\n", ci_lower, ci_upper);
+
+    // Ausgabe der negativen Latenzen
+    printf("Anzahl der negativen Latenzen: %d\n", negative_latencies_count);
 
     return 0;
 }
