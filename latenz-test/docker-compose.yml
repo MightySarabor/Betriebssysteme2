@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  server:
+    build: .
+    container_name: zmq_server
+
+  client:
+    build: .
+    container_name: zmq_client
+    depends_on:
+      - server
+    command: ./client
